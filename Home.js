@@ -1,25 +1,41 @@
 import React, { useState } from 'react';
-import { View, Text, Button, Image, Alert } from 'react-native';
-import * as ImagePicker from 'expo-image-picker'; // Import ImagePicker from Expo
+import { View, Text, TextInput, Image, Alert, StyleSheet, ScrollView } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import RNPickerSelect from 'react-native-picker-select';
-import styles from './AppStyles'; // Assuming you have this file for styles
+import styles from './AppStyles';
 import * as FileSystem from 'expo-file-system';
-import GradientButton from './Button'; // Custom GradientButton component
+import GradientButton from './Button';
+import MapView, { Marker } from 'react-native-maps';
+
+
 
 export default function HomeScreen() {
     const [selectedCountry, setSelectedCountry] = useState(null);
+    const [town, setTown] = useState('');
     const [image, setImage] = useState(null);
+    const [region, setRegion] = useState({
+        latitude: 40.227352181093636,
+        longitude: -74.91641223206882,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+    });
+
+    const mapStyle = StyleSheet.create({
+        map: {
+            width: '100%',
+            height: 400,
+        }
+    });
+
     const [analysisResult, setAnalysisResult] = useState(null);
 
     const pickImage = async () => {
-        // Request permission to access the media library
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to make this work!');
             return;
         }
 
-        // Permission is granted, proceed with opening the image picker
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.All,
             allowsEditing: true,
@@ -28,127 +44,117 @@ export default function HomeScreen() {
         });
 
         if (!result.cancelled && result.assets && result.assets.length > 0) {
-            const imageUri = result.assets[0].uri;  // Access the uri of the first image in the assets array
-            console.log(imageUri);  // This should now log the correct URI
-            setImage(imageUri);  // Set the selected image for UI display
-        
+            const imageUri = result.assets[0].uri;
+            setImage(imageUri);
             const savedImagePath = await saveImage(imageUri);
-            if (savedImagePath) {
-                await uploadImage(savedImagePath);  // Use the saved image path for uploading
-            }
+if (savedImagePath) {
+    setImage(savedImagePath);  // Update the state to reflect the new image path
+    await uploadImage(savedImagePath);
+}
+
         }
-        
     };
 
-
-    // Function to save the image to the file system
     const saveImage = async (imageUri) => {
-        const fileName = imageUri.split('/').pop(); // Extract the file name
-        const newPath = FileSystem.documentDirectory + fileName; // Define the new path
-
+        const fileName = imageUri.split('/').pop();
+        const newPath = FileSystem.documentDirectory + fileName;
+        console.log('Attempting to save image:', imageUri);
+    
         try {
-            await FileSystem.moveAsync({
-                from: imageUri,
-                to: newPath,
-            });
+            await FileSystem.moveAsync({ from: imageUri, to: newPath });
             console.log('Image saved to:', newPath);
-            return newPath;  // Return the new path for future use
+            return newPath;
         } catch (error) {
             console.error('Error saving image:', error);
-            Alert.alert('Error', 'Failed to save the image');
-            return null;  // In case of error, return null
+            Alert.alert('Error', `Failed to save the image: ${error.message}`);
+            return null;
         }
     };
-
+    
     const uploadImage = async (imageUri) => {
         const formData = new FormData();
         const fileExtension = imageUri.split('.').pop();
-        let mimeType = 'image/jpeg'; // Default to JPEG
-        if (fileExtension === 'png') {
-            mimeType = 'image/png';
-        } else if (fileExtension === 'jpg' || fileExtension === 'jpeg') {
-            mimeType = 'image/jpeg';
-        } else if (fileExtension === 'gif') {
-            mimeType = 'image/gif';
-        }
-        formData.append('file', {
-            uri: imageUri,
-            type: mimeType, // Dynamically set the MIME type
-            name: `image.${fileExtension}`,
-        });
+        const mimeTypeMap = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif'
+        };
+        const mimeType = mimeTypeMap[fileExtension.toLowerCase()] || 'application/octet-stream';
+        formData.append('file', { uri: imageUri, type: mimeType, name: `image.${fileExtension}` });
     
-        // Ensure selectedCountry is not null or undefined before making the request
+        console.log('Preparing to upload image:', imageUri);
+    
         if (!selectedCountry) {
             Alert.alert('Error', 'Please select a country first');
             return;
         }
-
+    
         try {
-            console.log(formData)
-            const response = await fetch(`http://192.168.1.210:5000/predict?country=${selectedCountry}`, {
-    method: 'POST',
-    body: formData,
-    headers: {
-        'Content-Type': 'multipart/form-data',
-    },
-});
-
-const result = await response.json();
-if (response.ok) {
-    console.log('Upload success:', result);
-    setAnalysisResult(result);  // The result now includes both prediction and confidence
-    Alert.alert('Results', `Prediction: ${result.prediction}, Confidence: ${(result.confidence * 100).toFixed(2)}%`);
-} else {
-    console.error('Upload failed:', result.error);
-    Alert.alert('Upload Failed', result.error);
-}
-
-            // const response = await fetch(`http://192.168.1.210:5000/predict?country=${selectedCountry}`, {
-            //     method: 'POST',
-            //     body: formData,
-            //     headers: {
-            //         'Accept': 'application/json',
-            //       },
-                  
-            // });
-            // const result = await response.json();
-            // if (response.ok) {
-            //     console.log('Upload success:', result);
-            //     setAnalysisResult(result);  // Update the analysisResult state with the server response
-            //     Alert.alert('Results', JSON.stringify(result));
-            // } else {
-            //     console.error('Upload failed:', result.error);
-            //     Alert.alert('Upload Failed', result.error);
-            // }
+            const response = await fetch(`http://REPLACE_WITH_IP/predict?country=${selectedCountry}&town=${encodeURIComponent(town)}`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+    
+            const result = await response.json();
+            if (response.ok) {
+                setAnalysisResult(result);
+                Alert.alert('Results', `Town: ${town}, Prediction: ${result.prediction}, Confidence: ${result.confidence}%, Where to recycle: ${result.centers}`);
+            } else {
+                console.error('Upload failed:', result.error);
+                Alert.alert('Upload Failed', result.error || 'Unknown error');
+            }
         } catch (error) {
-            console.error('Error:', error);
-            Alert.alert('Error', 'Could not upload the image');
+            console.error('Failed to upload image:', error);
+            Alert.alert('Error', `Could not upload the image: ${error.message}`);
         }
     };
     
+    console.log("Current image URI:", image);
+    
 
-    // JSX for rendering the component
     return (
-        <View style={styles.container}>
+        <ScrollView style={styles.scroll_container} contentContainerStyle={styles.contentContainer}>
             <Text style={styles.title}>Select your country:</Text>
             <RNPickerSelect
                 onValueChange={(value) => setSelectedCountry(value)}
                 items={[
-                    { label: 'Germany', value: 'germany' },
-                    { label: 'South Korea', value: 'south_korea' },
-                    { label: 'USA', value: 'usa' },
+                    { label: 'Germany', value: 'Germany' },
+                    { label: 'South Korea', value: 'South_Korea' },
+                    { label: 'USA', value: 'USA' },
                     // Add other countries as needed...
                 ]}
                 style={{ inputIOS: styles.inputIOS, inputAndroid: styles.inputAndroid }}
                 placeholder={{ label: "Select a country", value: null }}
             />
+            <Text style={styles.label}>What town do you live in?</Text>  
+            <TextInput
+                style={styles.textInput}  // Define this style in your AppStyles
+                onChangeText={setTown}
+                value={town}
+                placeholder="Enter your town"
+            />
             <GradientButton title="Upload Image" onPress={pickImage} />
-            {image && <Image source={{ uri: image }} style={styles.image} />}
             {analysisResult && (
                 <View style={styles.resultContainer}>
                     <Text style={styles.resultText}>Analysis Result: {JSON.stringify(analysisResult)}</Text>
                 </View>
             )}
-        </View>
+                        {image && <Image source={{ uri: image }} style={styles.image} onError={(e) => console.log('Image loading error:', e.nativeEvent.error)} />}
+
+            <MapView
+                style={mapStyle.map}
+                initialRegion={region}
+                onRegionChangeComplete={setRegion}
+            >
+                <Marker
+                    coordinate={{ latitude: region.latitude, longitude: region.longitude }}
+                    title={"Pure Earth Solutions"}
+                    description={"Description"}
+                />
+            </MapView>
+        </ScrollView>
     );
+    
 }

@@ -7,6 +7,15 @@ export default StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  scroll_container: {
+    flex: 1,
+    padding: 20,
+  },
+  contentContainer: {
+    flexGrow: 1,
+    justifyContent: 'center', // Centers children vertically in the ScrollView
+    alignItems: 'center', // Centers children horizontally in the ScrollView
+  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -60,4 +69,22 @@ export default StyleSheet.create({
     color: '#333', // Dark text color for readability
     textAlign: 'center', // Center the text
   },
+  // Add to your styles in AppStyles.js
+textInput: {
+  height: 40,
+  margin: 12,
+  borderWidth: 1,
+  padding: 10,
+  backgroundColor: 'white',
+  borderColor: 'gray',
+  borderRadius: 5,
+},
+label: {
+  fontSize: 16,
+  marginLeft: 12,
+  marginTop: 20,
+  marginBottom: 5,
+  fontWeight: 'bold',
+}
+
 });
